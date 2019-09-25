@@ -17,9 +17,9 @@ git clone https://github.com/chrisdxie/uois.git
 cd uois/
 conda env create -f env.yml
 ```
-Note that in [env.yml](env.yml), we set `cudatoolkit=10.0` by default. Set the CUDA toolkit version to match the native CUDA version (in `/usr/local/cuda/`), for reasons discussed below. This can be checked with: `nvcc --version`. 
+In [env.yml](env.yml), we set `cudatoolkit=10.0` by default. Set the CUDA toolkit version to match the native CUDA version (in `/usr/local/cuda/`), since you must compile the hough voting code with corresponding CUDA compiler (`nvcc` is not provided with the `conda` `cudatoolkit` distribution). This can be checked with: `nvcc --version`. <span style="color:red">Note:</span> As of 9/24/19, it seems that PyTorch is not supported by CUDA 10.1. Please use CUDA <= 10.0. The code has been tested with PyTorch 1.0 and 1.2. 
 
-### Hough Voting layer setup
+### Hough Voting Layer
 
 To install the Hough Voting layer (written in CUDA/C++), first install [Eigen](http://eigen.tuxfamily.org/). Eigen is a C++ template library for linear algebra, consisting ONLY of header files. This can be done from the Github source code and `cmake`:
 
@@ -29,16 +29,16 @@ cd eigen-git-mirror/
 mkdir build/
 cd build/
 cmake ..
-make install
+sudo make install
 ```
 
-Note that `make install` will require sudo privileges to install to `/usr/local/include/`. If you do not have sudo access, do not run `make install` and simply edit [setup.py](src/hough_voting/setup.py) to point to the directory where the Eigen headers live (e.g. `~/local_installs/eigen-git-mirror/`).
+If you do not have sudo access, do not run `sudo make install` and simply edit [setup.py](src/hough_voting/setup.py) to point to the directory where the Eigen headers live (e.g. `<ROOT_DIR>/eigen-git-mirror/`). <span style="color:red">Note:</span> The code has been tested with commit 4b2884.
 
 Next, run the following line:
 
 ```bash
 conda activate uois
-cd src/hough_voting/
+cd <ROOT_DIR>/src/hough_voting/
 python setup.py install
 ```
 
@@ -49,12 +49,12 @@ You can find the models [here](https://drive.google.com/uc?id=1tf_ff-HsxotPavOqA
 
 ## How to run the network
 
-See [uois_example.ipynb](uois_example.ipynb) for an example of how to run the network on example images. In order to run this file, Jupyter Notebook must be installed (this is included in `env.yml`). If you haven't used Jupyter Notebooks before, [here](https://www.dataquest.io/blog/jupyter-notebook-tutorial/) is a tutorial to get you up to speed. This repository provides a few images in the [example_images](example_images) folder. 
+See [uois_example.ipynb](uois_example.ipynb) for an example of how to run the network on example images. In order to run this file, Jupyter Notebook must be installed (this is included in `env.yml`). If you haven't used Jupyter Notebooks before, [here](https://www.dataquest.io/blog/jupyter-notebook-tutorial/) is a tutorial to get you up to speed. This repository provides a few images in the [example_images](example_images/) folder. 
 
 Notes:
 
 * Make sure to activate the Anaconda environment before running jupyter. This can be done with ``` conda activate uois; jupyter notebook ```
-* the notebook should be run in the directory in which it lives (root directory of this codebase), otherwise the filepaths must be manually adjusted.
+* the notebook should be run in the directory in which it lives (`<ROOT_DIR>`), otherwise the filepaths must be manually adjusted.
 * After downloading and unzipping the models, make sure to update `checkpoint_dir` in [uois_example.ipynb](uois_example.ipynb) to point to the directory where the models live.
 
 ## Train the network

@@ -1,0 +1,23 @@
+# Ipython/python stuff
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
+
+# PyTorch checkpoints
+*.pth.tar
+*.pth
+
+# Results
+results/
+sandbox*.txt
+
+# External stuff
+external/
+
+# C++ compiled stuff
+build/
+dist/
+*.egg-info/
+
+# Other random things
+*.tar.gz
