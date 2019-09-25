@@ -1,6 +1,6 @@
 # The Best of Both Modes: Separately Leveraging RGB and Depth for Unseen Object Instance Segmentation
 
-[//]: # (<center><img src="MTCF_in_action.gif" height="200" /></center>)
+<img src="gifs/robot_grasping.gif" height="200" /> <img src="gifs/refinement.gif" height="200" />
 
 This is the implementation of our unseen object instance segmentation network. Our instance segmentation algorithm utilizes a two-stage method to explicitly leverage the strengths of depth and RGB separately for stronger instance segmentation. Surprisingly, our framework is able to learn from synthetic RGB-D data where the RGB is non-photorealistic. Details of the algorithm can be found in our CoRL 2019 paper:
 
@@ -17,7 +17,9 @@ git clone https://github.com/chrisdxie/uois.git
 cd uois/
 conda env create -f env.yml
 ```
-In [env.yml](env.yml), we set `cudatoolkit=10.0` by default. Set the CUDA toolkit version to match the native CUDA version (in `/usr/local/cuda/`), since you must compile the hough voting code with corresponding CUDA compiler (`nvcc` is not provided with the `conda` `cudatoolkit` distribution). This can be checked with: `nvcc --version`. <span style="color:red">Note:</span> As of 9/24/19, it seems that PyTorch is not supported by CUDA 10.1. Please use CUDA <= 10.0. The code has been tested with PyTorch 1.0 and 1.2. 
+In [env.yml](env.yml), we set `cudatoolkit=10.0` by default. Set the CUDA toolkit version to match the native CUDA version (in `/usr/local/cuda/`), since you must compile the hough voting code with corresponding CUDA compiler (`nvcc` is not provided with the `conda` `cudatoolkit` distribution). This can be checked with: `nvcc --version`. 
+
+<span style="color:red">Note:</span> As of 9/24/19, it seems that PyTorch is not supported by CUDA 10.1. Please use CUDA <= 10.0. The code has been tested with PyTorch 1.0 and 1.2. 
 
 ### Hough Voting Layer
 
@@ -32,7 +34,9 @@ cmake ..
 sudo make install
 ```
 
-If you do not have sudo access, do not run `sudo make install` and simply edit [setup.py](src/hough_voting/setup.py) to point to the directory where the Eigen headers live (e.g. `<ROOT_DIR>/eigen-git-mirror/`). <span style="color:red">Note:</span> The code has been tested with commit 4b2884.
+If you do not have sudo access, do not run `sudo make install` and simply edit [setup.py](src/hough_voting/setup.py) to point to the directory where the Eigen headers live (e.g. `<ROOT_DIR>/eigen-git-mirror/`). 
+
+<span style="color:red">Note:</span> The code has been tested with commit 4b2884.
 
 Next, run the following line:
 
