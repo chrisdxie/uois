@@ -49,7 +49,7 @@ python setup.py install
 Make sure that `cudatoolkit=...` is set to the native CUDA version (in `/usr/local/cuda/`) which will be used to compile the CUDA code. Otherwise, the compiled CUDA/C++ code may not be compatible with the conda-installed PyTorch.
 
 ## Models
-You can find the models [here](https://drive.google.com/uc?id=1tf_ff-HsxotPavOqAjUmweQUF_xTONOu&export=download). We provide a Depth Seeding Network (DSN) model trained on our synthetic Tabletop Object Dataset (TOD), a Region Refinement Network (RRN) model trained on TOD, and an RRN model trained on real data from the [Google Open Images Dataset (OID)](https://storage.googleapis.com/openimages/web/download.html).
+You can find the models [here](https://drive.google.com/uc?export=download&id=19wW-lfsGHRwQlwVnYhwrh5a4LhnZPYZA). We provide a Depth Seeding Network (DSN) model trained on our synthetic Tabletop Object Dataset (TOD), a Region Refinement Network (RRN) model trained on TOD, and an RRN model trained on real data from the [Google Open Images Dataset (OID)](https://storage.googleapis.com/openimages/web/download.html).
 
 ## How to run the network
 
