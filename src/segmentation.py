@@ -86,10 +86,9 @@ class DepthSeedingNetwork(object):
 
         # Whole model, for nn.DataParallel
         self.model = CombinedDSN(self.encoder, self.decoder, self.foreground_module, self.center_direction_module)
-        if torch.cuda.device_count() > 1:
-          print("Let's use", torch.cuda.device_count(), "GPUs!")
-          # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-          self.model = nn.DataParallel(self.model)
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
+        self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
 
         # Hough Voting stuff (this operates on CUDA only)
@@ -362,10 +361,9 @@ class RegionRefinementNetwork(object):
 
         # Whole model, for nn.DataParallel
         self.model = CombinedRRN(self.encoder, self.decoder, self.foreground_module)
-        if torch.cuda.device_count() > 1:
-          print("Let's use", torch.cuda.device_count(), "GPUs!")
-          # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-          self.model = nn.DataParallel(self.model)
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
+        self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
 
 
@@ -674,8 +672,8 @@ class TableTopSegmentor(object):
 
                 # crop the masks/rgb to 224x224 with some padding, save it as "initial_masks"
                 x_min, y_min, x_max, y_max = util_.mask_to_tight_box(mask)
-                x_padding = torch.round((x_max - x_min).float() * self.params['padding_percentage']).item()
-                y_padding = torch.round((y_max - y_min).float() * self.params['padding_percentage']).item()
+                x_padding = int(torch.round((x_max - x_min).float() * self.params['padding_percentage']).item())
+                y_padding = int(torch.round((y_max - y_min).float() * self.params['padding_percentage']).item())
 
                 # Pad and be careful of boundaries
                 x_min = max(x_min - x_padding, 0)
