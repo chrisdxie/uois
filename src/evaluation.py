@@ -11,66 +11,6 @@ OBJECTS_LABEL = 2
 
 
 # Code adapted from: https://github.com/davisvideochallenge/davis-2017/blob/master/python/lib/davis/measures/f_boundary.py
-def seg2bmap(seg,width=None,height=None):
-    """
-    From a segmentation, compute a binary boundary map with 1 pixel wide
-    boundaries.  The boundary pixels are offset by 1/2 pixel towards the
-    origin from the actual segment boundary.
-    Arguments:
-        seg     : Segments labeled from 1..k.
-        width     : Width of desired bmap  <= seg.shape[1]
-        height  :   Height of desired bmap <= seg.shape[0]
-    Returns:
-        bmap (ndarray): Binary boundary map.
-     David Martin <dmartin@eecs.berkeley.edu>
-     January 2003
- """
-
-    seg = seg.astype(np.bool)
-    seg[seg>0] = 1
-
-    assert np.atleast_3d(seg).shape[2] == 1
-
-    width  = seg.shape[1] if width  is None else width
-    height = seg.shape[0] if height is None else height
-
-    h,w = seg.shape[:2]
-
-    ar1 = float(width) / float(height)
-    ar2 = float(w) / float(h)
-
-    assert not (width>w | height>h | abs(ar1-ar2)>0.01),\
-            'Can''t convert %dx%d seg to %dx%d bmap.'%(w,h,width,height)
-
-    e  = np.zeros_like(seg)
-    s  = np.zeros_like(seg)
-    se = np.zeros_like(seg)
-
-    e[:,:-1]    = seg[:,1:]
-    s[:-1,:]    = seg[1:,:]
-    se[:-1,:-1] = seg[1:,1:]
-
-    b        = seg^e | seg^s | seg^se
-    b[-1,:]  = seg[-1,:]^e[-1,:]
-    b[:,-1]  = seg[:,-1]^s[:,-1]
-    b[-1,-1] = 0
-
-    # from IPython import embed; embed()
-
-    if w == width and h == height:
-        bmap = b
-    else:
-        bmap = np.zeros((height,width))
-        for x in range(w):
-            for y in range(h):
-                if b[y,x]:
-                    j = 1+floor((y-1)+height / h)
-                    i = 1+floor((x-1)+width  / h)
-                    bmap[j,i] = 1;
-
-    return bmap
-
-# Code adapted from: https://github.com/davisvideochallenge/davis-2017/blob/master/python/lib/davis/measures/f_boundary.py
 def boundary_overlap(predicted_mask, gt_mask, bound_th=0.003):
     """
     Compute true positives of overlapped masks, using dilated boundaries
@@ -87,8 +27,8 @@ def boundary_overlap(predicted_mask, gt_mask, bound_th=0.003):
             np.ceil(bound_th*np.linalg.norm(predicted_mask.shape))
 
     # Get the pixel boundaries of both masks
-    fg_boundary = seg2bmap(predicted_mask);
-    gt_boundary = seg2bmap(gt_mask);
+    fg_boundary = util_.seg2bmap(predicted_mask);
+    gt_boundary = util_.seg2bmap(gt_mask);
 
     from skimage.morphology import disk
 
@@ -207,26 +147,24 @@ def multilabel_metrics(prediction, gt, obj_detect_threshold=0.75):
     boundary_prec_denom = 0. # precision_tps + precision_fps
     for pred_j in labels_pred:
         pred_mask = (prediction == pred_j)
-        boundary_prec_denom += np.sum(seg2bmap(pred_mask))
+        boundary_prec_denom += np.sum(util_.seg2bmap(pred_mask))
     boundary_rec_denom = 0. # recall_tps + recall_fns
     for gt_i in labels_gt:
         gt_mask = (gt == gt_i)
-        boundary_rec_denom += np.sum(seg2bmap(gt_mask))
+        boundary_rec_denom += np.sum(util_.seg2bmap(gt_mask))
 
 
     ### Compute the Hungarian assignment ###
     F[np.isnan(F)] = 0
     m = munkres.Munkres()
     assignments = m.compute(F.max() - F.copy()) # list of (y,x) indices into F (these are the matchings)
+    idx = tuple(np.array(assignments).T)
 
     ### Compute the number of "detected objects" ###
     num_obj_detected = 0
     for a in assignments:
         if F[a] > obj_detect_threshold:
             num_obj_detected += 1
-
-    ### Compute metrics with assignments ###
-    idx = tuple(np.array(assignments).T)
 
     # Overlap measures
     precision = np.sum(true_positives[idx]) / np.sum(prediction.clip(0,2) == OBJECTS_LABEL)

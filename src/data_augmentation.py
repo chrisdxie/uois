@@ -1,14 +1,10 @@
 import torch
 import random
 import numpy as np
-import numbers
-from PIL import Image # PyTorch likes PIL instead of cv2
 import cv2
 
-# My libraries
+# My Libraries
 from .util import utilities as util_
-
-
 
 
 ##### Useful Utilities #####
@@ -52,11 +48,11 @@ def rotate(img, angle, center=None, interpolation=cv2.INTER_LINEAR):
 
 
 
-##### Depth Augmentations #####
+##### Depth augmentations #####
 
 def add_noise_to_depth(depth_img, noise_params):
-    """ Distort depth image with multiplicative gamma noise.
-        This is adapted from the DexNet 2.0 codebase.
+    """ Add noise to depth image. 
+        This is adapted from the DexNet 2.0 code.
         Their code: https://github.com/BerkeleyAutomation/gqcnn/blob/75040b552f6f7fb264c27d427b404756729b5e88/gqcnn/sgd_optimizer.py
 
         @param depth_img: a [H x W] set of depth z values
@@ -70,8 +66,7 @@ def add_noise_to_depth(depth_img, noise_params):
     return depth_img
 
 def add_noise_to_xyz(xyz_img, depth_img, noise_params):
-    """ Add (approximate) Gaussian Process noise to ordered point cloud.
-        This is adapted from the DexNet 2.0 codebase.
+    """ Add (approximate) Gaussian Process noise to ordered point cloud
 
         @param xyz_img: a [H x W x 3] ordered point cloud
     """
@@ -81,8 +76,13 @@ def add_noise_to_xyz(xyz_img, depth_img, noise_params):
 
     # Additive noise: Gaussian process, approximated by zero-mean anisotropic Gaussian random variable,
     #                 which is rescaled with bicubic interpolation.
-    small_H, small_W = (np.array([H, W]) / noise_params['gp_rescale_factor']).astype(int)
-    additive_noise = np.random.normal(loc=0.0, scale=noise_params['gaussian_scale'], size=(small_H, small_W, C))
+    gp_rescale_factor = np.random.randint(noise_params['gp_rescale_factor_range'][0],
+                                          noise_params['gp_rescale_factor_range'][1])
+    gp_scale = np.random.uniform(noise_params['gaussian_scale_range'][0],
+                                 noise_params['gaussian_scale_range'][1])
+
+    small_H, small_W = (np.array([H, W]) / gp_rescale_factor).astype(int)
+    additive_noise = np.random.normal(loc=0.0, scale=gp_scale, size=(small_H, small_W, C))
     additive_noise = cv2.resize(additive_noise, (W, H), interpolation=cv2.INTER_CUBIC)
     xyz_img[depth_img > 0, :] += additive_noise[depth_img > 0, :]
 
@@ -90,7 +90,7 @@ def add_noise_to_xyz(xyz_img, depth_img, noise_params):
 
 def dropout_random_ellipses(depth_img, noise_params):
     """ Randomly drop a few ellipses in the image for robustness.
-        This is adapted from the DexNet 2.0 codebase.
+        This is adapted from the DexNet 2.0 code.
         Their code: https://github.com/BerkeleyAutomation/gqcnn/blob/75040b552f6f7fb264c27d427b404756729b5e88/gqcnn/sgd_optimizer.py
 
         @param depth_img: a [H x W] set of depth z values
@@ -142,6 +142,18 @@ def standardize_image(image):
         image_standardized[...,i] = (image[...,i]/255. - mean[i]) / std[i]
 
     return image_standardized
+
+def unstandardize_image(image):
+    """ Convert a numpy.ndarray [H x W x 3] standardized image back to RGB (type np.uint8)
+        Inverse of standardize_image()
+
+        @return: a [H x W x 3] numpy array of type np.uint8
+    """
+
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    orig_img = (image * std[None,None,:] + mean[None,None,:]) * 255.
+    return orig_img.round().astype(np.uint8)
 
 def random_color_warp(image, d_h=None, d_s=None, d_l=None):
     """ Given an RGB image [H x W x 3], add random hue, saturation and luminosity to the image

@@ -4,12 +4,18 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import glob
 import cv2
+import json
+import pybullet as p
 
-# My libraries
 from .util import utilities as util_
 from . import data_augmentation
 
 NUM_VIEWS_PER_SCENE = 7
+
+BACKGROUND_LABEL = 0
+TABLE_LABEL = 1
+OBJECTS_LABEL = 2
+
 
 ###### Some utilities #####
 
@@ -19,47 +25,6 @@ def worker_init_fn(worker_id):
     """
     np.random.seed(np.random.get_state()[1][0] + worker_id)
 
-def compute_xyz(depth_img, camera_params):
-    """ Compute ordered point cloud from depth image and camera parameters.
-
-        If focal lengths fx,fy are stored in the camera_params dictionary, use that.
-        Else, assume camera_params contains parameters used to generate synthetic data (e.g. fov, near, far, etc)
-
-        @param depth_img: a [H x W] numpy array of depth values in meters
-        @param camera_params: a dictionary with parameters of the camera used 
-    """
-
-    # Compute focal length from camera parameters
-    if 'fx' in camera_params and 'fy' in camera_params:
-        fx = camera_params['fx']
-        fy = camera_params['fy']
-    else: # simulated data
-        aspect_ratio = camera_params['img_width'] / camera_params['img_height']
-        e = 1 / (np.tan(np.radians(camera_params['fov']/2.)))
-        t = camera_params['near'] / e; b = -t
-        r = t * aspect_ratio; l = -r
-        alpha = camera_params['img_width'] / (r-l) # pixels per meter
-        focal_length = camera_params['near'] * alpha # focal length of virtual camera (frustum camera)
-        fx = focal_length; fy = focal_length
-
-    if 'x_offset' in camera_params and 'y_offset' in camera_params:
-        x_offset = camera_params['x_offset']
-        y_offset = camera_params['y_offset']
-    else: # simulated data
-        x_offset = camera_params['img_width']/2
-        y_offset = camera_params['img_height']/2
-
-    indices = util_.build_matrix_of_indices(camera_params['img_height'], camera_params['img_width'])
-    indices[..., 0] = np.flipud(indices[..., 0]) # pixel indices start at top-left corner. for these equations, it starts at bottom-left
-    z_e = depth_img
-    x_e = (indices[..., 1] - x_offset) * z_e / fx
-    y_e = (indices[..., 0] - y_offset) * z_e / fy
-    xyz_img = np.stack([x_e, y_e, z_e], axis=-1) # Shape: [H x W x 3]
-    
-    return xyz_img
-
-
-
 
 ############# Synthetic Tabletop Object Dataset #############
 
@@ -68,9 +33,9 @@ class Tabletop_Object_Dataset(Dataset):
     """
 
 
-    def __init__(self, base_dir, train_or_test, params):
+    def __init__(self, base_dir, train_or_test, config):
         self.base_dir = base_dir
-        self.params = params
+        self.config = config
         self.train_or_test = train_or_test
 
         # Get a list of all scenes
@@ -78,6 +43,10 @@ class Tabletop_Object_Dataset(Dataset):
         self.len = len(self.scene_dirs) * NUM_VIEWS_PER_SCENE
 
         self.name = 'TableTop'
+
+        if 'v6' in self.base_dir:
+            global OBJECTS_LABEL
+            OBJECTS_LABEL = 4
 
     def __len__(self):
         return self.len
@@ -87,12 +56,17 @@ class Tabletop_Object_Dataset(Dataset):
                 - random color warping
         """
         rgb_img = rgb_img.astype(np.float32)
+
+        if self.config['use_data_augmentation']:
+            # rgb_img = data_augmentation.random_color_warp(rgb_img)
+            pass
         rgb_img = data_augmentation.standardize_image(rgb_img)
 
         return rgb_img
 
-    def process_depth(self, depth_img, seg_img):
+    def process_depth(self, depth_img):
         """ Process depth channel
+                TODO: CHANGE THIS
                 - change from millimeters to meters
                 - cast to float32 data type
                 - add random noise
@@ -103,60 +77,87 @@ class Tabletop_Object_Dataset(Dataset):
         depth_img = (depth_img / 1000.).astype(np.float32)
 
         # add random noise to depth
-        if self.params['use_data_augmentation']:
-            depth_img = data_augmentation.add_noise_to_depth(depth_img, self.params)
-            depth_img = data_augmentation.dropout_random_ellipses(depth_img, self.params)
+        if self.config['use_data_augmentation']:
+            depth_img = data_augmentation.add_noise_to_depth(depth_img, self.config)
+            # depth_img = data_augmentation.dropout_random_ellipses(depth_img, self.config)
 
-        # Compute xyz ordered point cloud and add noise
-        xyz_img = compute_xyz(depth_img, self.params)
-        if self.params['use_data_augmentation']:
-            xyz_img = data_augmentation.add_noise_to_xyz(xyz_img, depth_img, self.params)
+        # Compute xyz ordered point cloud
+        xyz_img = util_.compute_xyz(depth_img, self.config)
+        if self.config['use_data_augmentation']:
+            xyz_img = data_augmentation.add_noise_to_xyz(xyz_img, depth_img, self.config)
 
         return xyz_img
 
-    def process_label(self, foreground_labels):
+    def process_label_3D(self, foreground_labels, xyz_img, scene_description):
         """ Process foreground_labels
-                - Map the foreground_labels to {0, 1, ..., K-1}
 
             @param foreground_labels: a [H x W] numpy array of labels
+            @param xyz_img: a [H x W x 3] numpy array of xyz coordinates (in left-hand coordinate system)
+            @param scene_description: a Python dictionary describing scene
 
             @return: foreground_labels
-                     direction_labels: a [H x W x 2] numpy array of 2D directions. The i,j^th element has (y,x) direction to object center
+                     offsets: a [H x W x 2] numpy array of 2D directions. The i,j^th element has (y,x) direction to object center
         """
-        # Find the unique (nonnegative) foreground_labels, map them to {0, ..., K-1}
-        unique_nonnegative_indices = np.unique(foreground_labels)
-        mapped_labels = foreground_labels.copy()
-        for k in range(unique_nonnegative_indices.shape[0]):
-            mapped_labels[foreground_labels == unique_nonnegative_indices[k]] = k
-        foreground_labels = mapped_labels
+
+        # Any zero depth value will have foreground label set to background
+        foreground_labels = foreground_labels.copy()
+        foreground_labels[xyz_img[..., 2] == 0] = 0
+
+        # Get inverse of camera extrinsics matrix. This is called "view_matrix" in OpenGL jargon
+        view_num = scene_description['view_num']
+        if view_num == 0: # bg-only image
+            camera_dict = scene_description['views']['background']
+        elif view_num == 1: # bg+table image
+            key = 'background+tabletop' if 'v6' in self.base_dir else 'background+table'
+            camera_dict = scene_description['views'][key] # table for TODv5, tabletop for TODv6
+        else: # bg+table+objects image
+            key = 'background+tabletop' if 'v6' in self.base_dir else 'background+table'
+            camera_dict = scene_description['views'][key + '+objects'][view_num-2]
+        view_matrix = p.computeViewMatrix(camera_dict['camera_pos'], 
+                                          camera_dict['lookat_pos'], 
+                                          camera_dict['camera_up_vector']
+                                         )
+        view_matrix = np.array(view_matrix).reshape(4,4, order='F')
 
         # Compute object centers and directions
         H, W = foreground_labels.shape
-        direction_labels = np.stack([np.ones((H,W)), np.zeros((H, W))], axis=-1).astype(np.float32) # Shape: [H x W x 2]
-        pixel_indices = util_.build_matrix_of_indices(H, W)
-        for k in np.unique(foreground_labels):
+        offsets = np.zeros((H,W,3), dtype=np.float32)
+        cf_3D_centers = np.zeros((100, 3), dtype=np.float32) # 100 max object centers
+        for i, k in enumerate(np.unique(foreground_labels)):
 
-            if k in [0, 1]: # background, table
+            # Get mask
+            mask = foreground_labels == k
+
+            # For background/table, prediction direction should point towards origin
+            if k in [BACKGROUND_LABEL, TABLE_LABEL]:
+                offsets[mask, ...] = 0
                 continue
 
-            # Get object mask
-            object_mask = foreground_labels == k
+            # Compute 3D object centers in camera frame
+            ind = k - OBJECTS_LABEL
+            wf_3D_center = np.array(scene_description['object_descriptions'][ind]['axis_aligned_bbox3D_center'])
+            cf_3D_center = view_matrix.dot(np.append(wf_3D_center, 1.))[:3] # in OpenGL camera frame (right-hand system, z-axis pointing backward)
+            cf_3D_center[2] = -1 * cf_3D_center[2] # negate z to get the left-hand system, z-axis pointing forward
 
-            # Get average of all pixel indices in mask
-            center = np.mean(pixel_indices[object_mask, :], axis=0) # Shape: [2]. y_center, x_center
+            # If center isn't contained within the object, use point cloud average
+            if cf_3D_center[0] < xyz_img[mask, 0].min() or \
+               cf_3D_center[0] > xyz_img[mask, 0].max() or \
+               cf_3D_center[1] < xyz_img[mask, 1].min() or \
+               cf_3D_center[1] > xyz_img[mask, 1].max():
+                cf_3D_center = xyz_img[mask, ...].mean(axis=0)
 
             # Get directions
-            object_center_directions = (center - pixel_indices).astype(np.float32) # Shape: [H x W x 2]
-            object_center_directions = object_center_directions / np.maximum(np.linalg.norm(object_center_directions, axis=2, keepdims=True), 1e-10)
+            cf_3D_centers[i-2] = cf_3D_center
+            object_center_offsets = (cf_3D_center - xyz_img).astype(np.float32) # Shape: [H x W x 3]
 
             # Add it to the labels
-            direction_labels[object_mask] = object_center_directions[object_mask]
+            offsets[mask, ...] = object_center_offsets[mask, ...]
 
-        return foreground_labels, direction_labels
+        return offsets, cf_3D_centers
 
     def __getitem__(self, idx):
 
-        cv2.setNumThreads(0) # some hack to make sure pyTorch doesn't deadlock. Found at https://github.com/pytorch/pytorch/issues/1355
+        cv2.setNumThreads(0) # some hack to make sure pyTorch doesn't deadlock. Found at https://github.com/pytorch/pytorch/issues/1355. Seems to work for me
 
         # Get scene directory
         scene_idx = idx // NUM_VIEWS_PER_SCENE
@@ -165,44 +166,51 @@ class Tabletop_Object_Dataset(Dataset):
         # Get view number
         view_num = idx % NUM_VIEWS_PER_SCENE
 
-        # Label
-        foreground_labels_filename = scene_dir + f"segmentation_{view_num:05d}.png"
-        label_abs_path = '/'.join(foreground_labels_filename.split('/')[-2:]) # Used for evaluation
-        foreground_labels = util_.imread_indexed(foreground_labels_filename)
-        foreground_labels, direction_labels = self.process_label(foreground_labels)
-
         # RGB image
         rgb_img_filename = scene_dir + f"rgb_{view_num:05d}.jpeg"
         rgb_img = cv2.cvtColor(cv2.imread(rgb_img_filename), cv2.COLOR_BGR2RGB)
         rgb_img = self.process_rgb(rgb_img)
 
         # Depth image
-        if self.train_or_test == 'train':
-            depth_img_filename = scene_dir + f"depth_{view_num:05d}.png"
-        elif self.train_or_test == 'test':
-            depth_img_filename = scene_dir + f"depth_noisy_{view_num:05d}.png"
+        depth_img_filename = scene_dir + f"depth_{view_num:05d}.png"
         depth_img = cv2.imread(depth_img_filename, cv2.IMREAD_ANYDEPTH) # This reads a 16-bit single-channel image. Shape: [H x W]
-        xyz_img = self.process_depth(depth_img, foreground_labels)
+        xyz_img = self.process_depth(depth_img)
+
+        # Labels
+        foreground_labels_filename = scene_dir + f"segmentation_{view_num:05d}.png"
+        foreground_labels = util_.imread_indexed(foreground_labels_filename)
+        scene_description_filename = scene_dir + "scene_description.txt"
+        scene_description = json.load(open(scene_description_filename))
+        scene_description['view_num'] = view_num
+
+        center_offset_labels, object_centers = self.process_label_3D(foreground_labels, xyz_img, scene_description)
+
+        label_abs_path = '/'.join(foreground_labels_filename.split('/')[-2:]) # Used for evaluation
 
         # Turn these all into torch tensors
         rgb_img = data_augmentation.array_to_tensor(rgb_img) # Shape: [3 x H x W]
         xyz_img = data_augmentation.array_to_tensor(xyz_img) # Shape: [3 x H x W]
         foreground_labels = data_augmentation.array_to_tensor(foreground_labels) # Shape: [H x W]
-        direction_labels = data_augmentation.array_to_tensor(direction_labels) # Shape: [2 x H x W]
+        center_offset_labels = data_augmentation.array_to_tensor(center_offset_labels) # Shape: [2 x H x W]
+        object_centers = data_augmentation.array_to_tensor(object_centers) # Shape: [100 x 3]
+        num_3D_centers = torch.tensor(np.count_nonzero(np.unique(foreground_labels) >= OBJECTS_LABEL))
 
         return {'rgb' : rgb_img,
                 'xyz' : xyz_img,
                 'foreground_labels' : foreground_labels,
-                'direction_labels' : direction_labels,
+                'center_offset_labels' : center_offset_labels,
+                'object_centers' : object_centers, # This is gonna bug out because the dimensions will be different per frame
+                'num_3D_centers' : num_3D_centers,
                 'scene_dir' : scene_dir,
                 'view_num' : view_num,
                 'label_abs_path' : label_abs_path,
                 }
 
 
-def get_TOD_train_dataloader(base_dir, params, batch_size=8, num_workers=4, shuffle=True):
+def get_TOD_train_dataloader(base_dir, config, batch_size=8, num_workers=4, shuffle=True):
 
-    dataset = Tabletop_Object_Dataset(base_dir + 'training_set/', 'train', params)
+    config = config.copy()
+    dataset = Tabletop_Object_Dataset(base_dir + 'training_set/', 'train', config)
 
     return DataLoader(dataset=dataset,
                       batch_size=batch_size,
@@ -210,11 +218,10 @@ def get_TOD_train_dataloader(base_dir, params, batch_size=8, num_workers=4, shuf
                       num_workers=num_workers,
                       worker_init_fn=worker_init_fn)
 
-def get_TOD_test_dataloader(base_dir, params, batch_size=8, num_workers=4, shuffle=False):
+def get_TOD_test_dataloader(base_dir, config, batch_size=8, num_workers=4, shuffle=False):
 
-    params = params.copy()
-    params['use_data_augmentation'] = False
-    dataset = Tabletop_Object_Dataset(base_dir + 'test_set/', 'test', params)
+    config = config.copy()
+    dataset = Tabletop_Object_Dataset(base_dir + 'test_set/', 'test', config)
 
     return DataLoader(dataset=dataset,
                       batch_size=batch_size,
@@ -228,12 +235,13 @@ def get_TOD_test_dataloader(base_dir, params, batch_size=8, num_workers=4, shuff
 ############# RGB Images Dataset (Google Open Images) #############
 
 class RGB_Objects_Dataset(Dataset):
-    """ Data loader for RGB Objects Dataset
+    """ Data loader for Tabletop Object Dataset
     """
 
-    def __init__(self, base_dir, start_list_file, train_or_test, params):
+
+    def __init__(self, base_dir, start_list_file, train_or_test, config):
         self.base_dir = base_dir
-        self.params = params
+        self.config = config
         self.train_or_test = train_or_test
 
         # Get a list of all instance labels
@@ -267,8 +275,8 @@ class RGB_Objects_Dataset(Dataset):
             x_max = x_min + y_delta
 
         sidelength = x_max - x_min
-        padding_percentage = np.random.beta(self.params['padding_alpha'], self.params['padding_beta'])
-        padding_percentage = max(padding_percentage, self.params['min_padding_percentage'])
+        padding_percentage = np.random.beta(self.config['padding_alpha'], self.config['padding_beta'])
+        padding_percentage = max(padding_percentage, self.config['min_padding_percentage'])
         padding = int(round(sidelength * padding_percentage))
         if padding == 0:
             print(f'Whoa, padding is 0... sidelength: {sidelength}, %: {padding_percentage}')
@@ -282,7 +290,7 @@ class RGB_Objects_Dataset(Dataset):
 
         # Crop
         if (y_min == y_max) or (x_min == x_max):
-            print('Whoa... something is wrong:', x_min, y_min, x_max, y_max)
+            print('Fuck... something is wrong:', x_min, y_min, x_max, y_max)
             print(morphed_label)
             print(label)
         img_crop = img[y_min:y_max+1, x_min:x_max+1]
@@ -297,40 +305,39 @@ class RGB_Objects_Dataset(Dataset):
         return img_crop, morphed_label_crop, label_crop
 
     def transform(self, img, label):
-        """ Data augmentation for RGB image and label
-                - RGB
-                    - Image standardization
-                - Label
-                    - Morphological transformation
-                    - rotation/translation
-                    - adding/cutting
-                    - random ellipses
+        """ Process RGB image
+                - standardize_image
+                - random color warping
+                - random horizontal flipping
         """
 
         img = img.astype(np.float32)
 
         # Data augmentation for mask
         morphed_label = label.copy()
-        if np.random.rand() < self.params['rate_of_morphological_transform']:
-            morphed_label = data_augmentation.random_morphological_transform(morphed_label, self.params)
-        if np.random.rand() < self.params['rate_of_translation']:
-            morphed_label = data_augmentation.random_translation(morphed_label, self.params)
-        if np.random.rand() < self.params['rate_of_rotation']:
-            morphed_label = data_augmentation.random_rotation(morphed_label, self.params)
+        if self.config['use_data_augmentation']:
+            if np.random.rand() < self.config['rate_of_morphological_transform']:
+                morphed_label = data_augmentation.random_morphological_transform(morphed_label, self.config)
+            if np.random.rand() < self.config['rate_of_translation']:
+                morphed_label = data_augmentation.random_translation(morphed_label, self.config)
+            if np.random.rand() < self.config['rate_of_rotation']:
+                morphed_label = data_augmentation.random_rotation(morphed_label, self.config)
 
-        sample = np.random.rand()
-        if sample < self.params['rate_of_label_adding']:
-            morphed_label = data_augmentation.random_add(morphed_label, self.params)
-        elif sample < self.params['rate_of_label_adding'] + self.params['rate_of_label_cutting']:
-            morphed_label = data_augmentation.random_cut(morphed_label, self.params)
-            
-        if np.random.rand() < self.params['rate_of_ellipses']:
-            morphed_label = data_augmentation.random_ellipses(morphed_label, self.params)
+            sample = np.random.rand()
+            if sample < self.config['rate_of_label_adding']:
+                morphed_label = data_augmentation.random_add(morphed_label, self.config)
+            elif sample < self.config['rate_of_label_adding'] + self.config['rate_of_label_cutting']:
+                morphed_label = data_augmentation.random_cut(morphed_label, self.config)
+                
+            if np.random.rand() < self.config['rate_of_ellipses']:
+                morphed_label = data_augmentation.random_ellipses(morphed_label, self.config)
 
         # Next, crop the mask with some padding, and resize to 224x224. Make sure to preserve the aspect ratio
         img_crop, morphed_label_crop, label_crop = self.pad_crop_resize(img, morphed_label, label)
 
-        # Data processing for RGB
+        # Data augmentation for RGB
+        # if self.config['use_data_augmentation']:
+        #     img_crop = data_augmentation.random_color_warp(img_crop)
         img_crop = data_augmentation.standardize_image(img_crop)
 
         # Turn into torch tensors
@@ -372,9 +379,9 @@ class RGB_Objects_Dataset(Dataset):
             'labels' : label_crop
         }
 
-def get_RGBO_train_dataloader(base_dir, params, batch_size=8, num_workers=4, shuffle=True):
+def get_RGBO_train_dataloader(base_dir, config, batch_size=8, num_workers=4, shuffle=True):
 
-    dataset = RGB_Objects_Dataset(base_dir, params['starts_file'], 'train', params)
+    dataset = RGB_Objects_Dataset(base_dir, config['starts_file'], 'train', config)
 
     return DataLoader(dataset=dataset,
                       batch_size=batch_size,
@@ -383,16 +390,14 @@ def get_RGBO_train_dataloader(base_dir, params, batch_size=8, num_workers=4, shu
                       worker_init_fn=worker_init_fn)
 
 
-
-
-############# Synthetic RGB Objects Dataset (Tabletop Objects Dataset) #############
+# Synthetic RGB dataset for training RGB Refinement Network
 class Synthetic_RGB_Objects_Dataset(RGB_Objects_Dataset):
-    """ Data loader for Synthetic RGB Objects Dataset
+    """ Data loader for Tabletop Object Dataset
     """
 
-    def __init__(self, base_dir, train_or_test, params):
+    def __init__(self, base_dir, train_or_test, config):
         self.base_dir = base_dir
-        self.params = params
+        self.config = config
         self.train_or_test = train_or_test
 
         # Get a list of all scenes
@@ -455,14 +460,13 @@ class Synthetic_RGB_Objects_Dataset(RGB_Objects_Dataset):
             'label_abs_path' : label_abs_path,
         }
 
-def get_Synth_RGBO_train_dataloader(base_dir, params, batch_size=8, num_workers=4, shuffle=True):
+def get_Synth_RGBO_train_dataloader(base_dir, config, batch_size=8, num_workers=4, shuffle=True):
 
-    dataset = Synthetic_RGB_Objects_Dataset(base_dir + 'training_set/','train', params)
+    dataset = Synthetic_RGB_Objects_Dataset(base_dir + 'training_set/','train', config)
 
     return DataLoader(dataset=dataset,
                       batch_size=batch_size,
                       shuffle=shuffle,
                       num_workers=num_workers,
                       worker_init_fn=worker_init_fn)
-
 
