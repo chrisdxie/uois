@@ -67,7 +67,7 @@ Notes:
 We provide sample training code in [train_DSN.ipynb](train_DSN.ipynb) and [train_RRN.ipynb](train_RRN.ipynb). We have not released our dataset; however, we have included [data loading](src/data_loader.py) and [data augmentation](src/data_augmentation.py) code in this release to help users get started training the network on their data.
 
 ## Citation
-Our code is released under GPLv3.
+Our code is released under the MIT license.
 
 If you find our work helpful in your research, please cite our work.
 
