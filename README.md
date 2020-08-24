@@ -2,6 +2,8 @@
 
 <img src="gifs/robot_grasping.gif" height="200" /> <img src="gifs/refinement.gif" height="200" />
 
+### Don't feel like compiling the Hough Voting Layer, or just want some better results? Checkout our new [UOIS-Net-3D  repository](https://github.com/chrisdxie/uois/tree/uois3d)!
+
 This is the implementation of our unseen object instance segmentation network. Our instance segmentation algorithm utilizes a two-stage method to explicitly leverage the strengths of depth and RGB separately for stronger instance segmentation. Surprisingly, our framework is able to learn from synthetic RGB-D data where the RGB is non-photorealistic. Details of the algorithm can be found in our CoRL 2019 paper:
 
 [Christopher Xie](https://chrisdxie.github.io), [Yu Xiang](https://yuxng.github.io), [Arsalan Mousavian](https://cs.gmu.edu/~amousavi/), [Dieter Fox](https://homes.cs.washington.edu/~fox/) <br/>
