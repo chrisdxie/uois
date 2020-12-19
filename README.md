@@ -53,6 +53,12 @@ Make sure that `cudatoolkit=...` is set to the native CUDA version (in `/usr/loc
 ## Models
 You can find the models [here](https://drive.google.com/uc?export=download&id=19wW-lfsGHRwQlwVnYhwrh5a4LhnZPYZA). We provide a Depth Seeding Network (DSN) model trained on our synthetic Tabletop Object Dataset (TOD), a Region Refinement Network (RRN) model trained on TOD, and an RRN model trained on real data from the [Google Open Images Dataset (OID)](https://storage.googleapis.com/openimages/web/download.html).
 
+## Data
+You can find the Tabletop Object Dataset (TOD) [here](https://drive.google.com/uc?export=download&id=1Du309Ye8J7v2c4fFGuyPGjf-C3-623vw). See the [data loading](src/data_loader.py) and [data augmentation](src/data_augmentation.py) code for more details.
+
+## Train the network
+We provide sample training code in [train_DSN.ipynb](train_DSN.ipynb) and [train_RRN.ipynb](train_RRN.ipynb).
+
 ## How to run the network
 
 See [uois_example.ipynb](uois_example.ipynb) for an example of how to run the network on example images. In order to run this file, Jupyter Notebook must be installed (this is included in `env.yml`). If you haven't used Jupyter Notebooks before, [here](https://www.dataquest.io/blog/jupyter-notebook-tutorial/) is a tutorial to get you up to speed. This repository provides a few images in the [example_images](example_images/) folder. 
@@ -62,9 +68,6 @@ Notes:
 * Make sure to activate the Anaconda environment before running jupyter. This can be done with ``` conda activate uois; jupyter notebook ```
 * the notebook should be run in the directory in which it lives (`<ROOT_DIR>`), otherwise the filepaths must be manually adjusted.
 * After downloading and unzipping the models, make sure to update `checkpoint_dir` in [uois_example.ipynb](uois_example.ipynb) to point to the directory where the models live.
-
-## Train the network
-We provide sample training code in [train_DSN.ipynb](train_DSN.ipynb) and [train_RRN.ipynb](train_RRN.ipynb). We have not released our dataset; however, we have included [data loading](src/data_loader.py) and [data augmentation](src/data_augmentation.py) code in this release to help users get started training the network on their data.
 
 ## Citation
 Our code is released under the MIT license.
