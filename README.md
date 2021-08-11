@@ -6,7 +6,7 @@ This is a PyTorch-based implementation of our network, UOIS-Net-3D, for unseen o
 
 [Unseen Object Instance Segmentation for Robotic Environments](https://arxiv.org/abs/2007.08073)<br/>
 [Christopher Xie](https://chrisdxie.github.io), [Yu Xiang](https://yuxng.github.io), [Arsalan Mousavian](https://cs.gmu.edu/~amousavi/), [Dieter Fox](https://homes.cs.washington.edu/~fox/) <br/>
-arXiv, 2020.
+IEEE Transactions on Robotics (T-RO), 2020.
 
 ## Installation
 
@@ -42,10 +42,10 @@ Our code is released under the MIT license.
 If you find our work helpful in your research, please cite our work.
 
 ```
-@inproceedings{xie2020uois3d,
+@article{xie2021unseen,
 author    = {Christopher Xie and Yu Xiang and Arsalan Mousavian and Dieter Fox},
 title     = {Unseen Object Instance Segmentation for Robotic Environments},
-booktitle = {arXiv:2007.08073},
-year      = {2020}
+journal   = {IEEE Transactions on Robotics (T-RO)},
+year      = {2021}
 }
 ```
