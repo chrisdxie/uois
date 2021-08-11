@@ -6,7 +6,7 @@ This is a PyTorch-based implementation of our network, UOIS-Net-3D, for unseen o
 
 [Unseen Object Instance Segmentation for Robotic Environments](https://arxiv.org/abs/2007.08073)<br/>
 [Christopher Xie](https://chrisdxie.github.io), [Yu Xiang](https://yuxng.github.io), [Arsalan Mousavian](https://cs.gmu.edu/~amousavi/), [Dieter Fox](https://homes.cs.washington.edu/~fox/) <br/>
-IEEE Transactions on Robotics (T-RO), 2020.
+IEEE Transactions on Robotics (T-RO), 2021.
 
 ## Installation
 
