@@ -13,7 +13,7 @@ IEEE Transactions on Robotics (T-RO), 2021.
 We highly recommend setting up a virtual environment using [Anaconda](https://www.anaconda.com/distribution/). Here is an example setup using these tools:
 
 ```bash
-git clone https://github.com/chrisdxie/uois3d.git
+git clone https://github.com/chrisdxie/uois.git
 cd uois3d/
 conda env create -f env.yml
 ```
