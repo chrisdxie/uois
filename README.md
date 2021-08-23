@@ -22,7 +22,7 @@ conda env create -f env.yml
 You can find the models [here](https://drive.google.com/uc?export=download&id=1CZgHk5VfhfvUosb8xlgzg7aKhprLpGC3). We provide a Depth Seeding Network (DSN) model trained on our synthetic Tabletop Object Dataset (TOD), a Region Refinement Network (RRN) model trained on TOD, and an RRN model trained on real data from the [Google Open Images Dataset (OID)](https://storage.googleapis.com/openimages/web/download.html).
 
 ## Data
-You can find the Tabletop Object Dataset (TOD) [here](https://drive.google.com/file/d/1itThz2GVBUAqXs3MaH92YWhoj0G6Mfg1/view?usp=sharing). See the [data loading](src/data_loader.py) and [data augmentation](src/data_augmentation.py) code for more details.
+You can find the Tabletop Object Dataset (TOD) [here](https://drive.google.com/uc?export=download&id=1itThz2GVBUAqXs3MaH92YWhoj0G6Mfg1). See the [data loading](src/data_loader.py) and [data augmentation](src/data_augmentation.py) code for more details.
 
 ## Train the network
 We provide sample training code in [train_DSN.ipynb](train_DSN.ipynb) and [train_RRN.ipynb](train_RRN.ipynb).
