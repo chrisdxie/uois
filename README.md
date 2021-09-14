@@ -51,10 +51,10 @@ python setup.py install
 Make sure that `cudatoolkit=...` is set to the native CUDA version (in `/usr/local/cuda/`) which will be used to compile the CUDA code. Otherwise, the compiled CUDA/C++ code may not be compatible with the conda-installed PyTorch.
 
 ## Models
-You can find the models [here](https://drive.google.com/uc?export=download&id=19wW-lfsGHRwQlwVnYhwrh5a4LhnZPYZA). We provide a Depth Seeding Network (DSN) model trained on our synthetic Tabletop Object Dataset (TOD), a Region Refinement Network (RRN) model trained on TOD, and an RRN model trained on real data from the [Google Open Images Dataset (OID)](https://storage.googleapis.com/openimages/web/download.html).
+You can find the models [here](https://drive.google.com/uc?export=download&id=10ljZmiX4PlPIdc3xJQbUQVa315PjGKm2). We provide a Depth Seeding Network (DSN) model trained on our synthetic Tabletop Object Dataset (TOD), a Region Refinement Network (RRN) model trained on TOD, and an RRN model trained on real data from the [Google Open Images Dataset (OID)](https://storage.googleapis.com/openimages/web/download.html).
 
 ## Data
-You can find the Tabletop Object Dataset (TOD) [here](https://drive.google.com/uc?export=download&id=1Du309Ye8J7v2c4fFGuyPGjf-C3-623vw). See the [data loading](src/data_loader.py) and [data augmentation](src/data_augmentation.py) code for more details.
+You can find the Tabletop Object Dataset (TOD) [here](https://drive.google.com/uc?export=download&id=157nWfb4pLbwAfOdMLls6q0lZQyqUCvLY). See the [data loading](src/data_loader.py) and [data augmentation](src/data_augmentation.py) code for more details.
 
 ## Train the network
 We provide sample training code in [train_DSN.ipynb](train_DSN.ipynb) and [train_RRN.ipynb](train_RRN.ipynb).
